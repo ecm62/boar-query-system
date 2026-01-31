@@ -2,75 +2,74 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 
-# 設定網頁標題與風格
-st.set_page_config(page_title="S.P.T.S Boar Management", layout="wide")
+# 設定網頁標題
+st.set_page_config(page_title="GLA 公豬查詢系統", layout="wide")
 
 def load_data():
-    # Google Sheets CSV 導出連結 (自動指向 BOAR 分頁)
+    # 您的試算表資訊
     sheet_id = "1qvo4INF0LZjA2u49grKW_cHeEPJO48_dk6gOlXoMgaM"
     gid = "1428367761"
     url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
     
     try:
-        df = pd.read_csv(url)
-        # 確保日期格式正確，若欄位名稱不同請修改此處
-        if 'Mating Date' in df.columns:
-            df['Mating Date'] = pd.to_datetime(df['Mating Date'])
+        # 讀取資料並忽略空白行
+        df = pd.read_csv(url).dropna(how='all')
+        # 轉換日期格式
+        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
         return df
     except Exception as e:
         st.error(f"資料讀取失敗: {e}")
         return None
 
-# --- 頁面呈現 ---
 st.title("🐗 公豬分級與配種查詢系統")
 st.markdown("---")
 
 df = load_data()
 
 if df is not None:
-    # 側邊欄：快速搜尋與過濾
-    search_id = st.sidebar.text_input("輸入公豬 ID (Boar ID)", "").upper()
+    # 修正：使用正確的欄位名稱 "Boar Ear Tag"
+    search_id = st.sidebar.text_input("輸入公豬耳號 (Boar Ear Tag)", "").strip()
     
-    # 計算時間範圍 (最近 30 天)
-    today = datetime.now()
-    last_month = today - timedelta(days=30)
+    # 計算最近一個月 (30天) 的時間點
+    last_month = datetime.now() - timedelta(days=30)
 
-    # 數據處理：公豬分級與配種資訊
-    # 假設欄位包含：'Boar ID', 'Grade', 'Mating Date', 'Sow ID'
-    
+    # 搜尋過濾
     if search_id:
-        result = df[df['Boar ID'].str.contains(search_id, na=False)]
+        result = df[df['Boar Ear Tag'].astype(str).str.contains(search_id, na=False, case=False)]
     else:
         result = df
 
-    # 分割顯示畫面
     col1, col2 = st.columns([1, 2])
 
     with col1:
         st.subheader("📊 公豬狀態概要")
         if search_id and not result.empty:
-            current_boar = result.iloc[0]
-            st.metric("當前公豬", current_boar['Boar ID'])
-            # 假設有分級欄位名為 'Grade'
-            grade = current_boar.get('Grade', 'N/A')
-            st.warning(f"公豬評級：{grade}")
+            # 取得該豬隻最新的一筆資料
+            latest_record = result.sort_values(by='Date', ascending=False).iloc[0]
+            st.metric("公豬耳號", latest_record['Boar Ear Tag'])
+            st.info(f"品種：{latest_record['Breed']}")
+            # 顯示活力指標
+            vitality = latest_record.get('aktiviti\nVitality', '無資料')
+            st.warning(f"最新活力評分：{vitality}")
         else:
-            st.info("請在左側輸入編號進行精準查詢")
+            st.info("請在左側輸入耳號進行查詢")
 
     with col2:
-        st.subheader("📅 最近一個月配種記錄")
-        if 'Mating Date' in result.columns:
-            recent_mating = result[result['Mating Date'] >= last_month].sort_values(by='Mating Date', ascending=False)
-            if not recent_mating.empty:
-                st.dataframe(recent_mating, use_container_width=True)
-            else:
-                st.write("此公豬最近 30 天內無配種記錄。")
+        st.subheader("📅 最近一個月配種/採精紀錄")
+        # 篩選最近 30 天數據
+        recent_mating = result[result['Date'] >= last_month].sort_values(by='Date', ascending=False)
+        
+        if not recent_mating.empty:
+            # 顯示對工人有意義的資訊
+            display_df = recent_mating[['Date', 'Boar Ear Tag', 'aktiviti\nVitality', 'penumpuan, Concentration\n(x100 million/ml)']]
+            st.dataframe(display_df, use_container_width=True)
         else:
-            st.error("找不到 'Mating Date' 欄位，請檢查試算表標頭。")
+            st.write("此公豬最近 30 天內無記錄。")
 
     st.markdown("---")
-    st.subheader("📁 全場公豬清單")
-    st.dataframe(df, use_container_width=True)
+    st.subheader("📋 原始數據預覽 (BOAR 分頁)")
+    st.write("顯示最新的 50 筆紀錄：")
+    st.dataframe(df.sort_values(by='Date', ascending=False).head(50), use_container_width=True)
 
 else:
-    st.warning("請檢查 Google Sheets 是否已開啟共用連結權限。")
+    st.warning("無法載入資料，請確認試算表權限設定。")
