@@ -2,97 +2,94 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 
-# --- Enterprise UI Configuration ---
-st.set_page_config(page_title="GLA Boar System", layout="wide", initial_sidebar_state="expanded")
+# --- 專業管理介面設定 ---
+st.set_page_config(page_title="GLA Boar System", layout="wide")
 
-# Custom CSS for refined aesthetics (Smaller fonts, tighter padding)
+# CSS 優化：精簡化間距與字體大小，移除冗餘白邊
 st.markdown("""
     <style>
-    .main { font-size: 14px; }
-    h1 { font-size: 24px !important; font-weight: 700; color: #1E3A8A; margin-bottom: 0px; }
-    h2 { font-size: 18px !important; font-weight: 600; color: #374151; margin-top: 20px; }
-    h3 { font-size: 16px !important; color: #1F2937; }
-    .stMetric { background-color: #F3F4F6; padding: 10px; border-radius: 5px; }
-    [data-testid="stTable"] { font-size: 12px; }
-    [data-testid="stDataFrame"] { font-size: 12px; }
+    .stApp { background-color: #FFFFFF; }
+    h2 { font-size: 18px !important; color: #1E3A8A; border-bottom: 2px solid #E5E7EB; padding-bottom: 5px; margin-top: 10px; }
+    .stMetric { background-color: #F8FAFC; border: 1px solid #CBD5E1; padding: 5px; border-radius: 4px; }
+    div[data-testid="stMetricValue"] { font-size: 20px !important; font-weight: bold; }
+    [data-testid="stTable"] { font-size: 12px !important; }
+    [data-testid="stDataFrame"] { font-size: 12px !important; }
+    .stTextInput>div>div>input { background-color: #F1F5F9; font-size: 16px; }
     </style>
     """, unsafe_allow_html=True)
 
 def load_data():
+    # 資料來源與範圍定義
     sheet_id = "1qvo4INF0LZjA2u49grKW_cHeEPJO48_dk6gOlXoMgaM"
     gid = "1428367761"
     url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
     try:
+        # 讀取全表
         df = pd.read_csv(url)
-        # Ensure 'Date' column exists and is parsed
+        # 日期轉換 (假設日期欄位名稱為 Date)
         if 'Date' in df.columns:
             df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
         return df
     except Exception as e:
-        st.error(f"System Error: Connection Failed / Kegagalan Sambungan: {e}")
+        st.error(f"System Link Error: {e}")
         return None
 
-# --- Header Section ---
-st.title("BOAR PERFORMANCE & MATING TRACKER")
-st.caption("PEMANTAUAN PRESTASI BOAR & REKOD MENGAWAN")
-st.markdown("---")
-
+# --- TOP: 查詢框架 (Search Framework) ---
 df = load_data()
 
-if df is not None:
-    # --- Sidebar Search ---
-    st.sidebar.header("SEARCH / CARIAN")
-    search_id = st.sidebar.text_input("Boar Ear Tag / Tag Telinga Boar", placeholder="e.g. L1234").strip()
+with st.container():
+    st.markdown("### 🔍 SEARCH BOAR / CARI BOAR")
+    search_id = st.text_input("", placeholder="Enter Boar Ear Tag (e.g., L10020)...", label_visibility="collapsed").strip()
+
+if df is not None and search_id:
+    # 篩選特定公豬數據
+    result = df[df['Boar Ear Tag'].astype(str).str.contains(search_id, na=False, case=False)]
     
-    # Range Definitions
-    grade_cols = df.columns[21:30]    # V:AD (Grading Data)
-    history_cols = df.columns[76:83]  # BY:CE (History Data)
-    four_weeks_limit = datetime.now() - timedelta(weeks=4)
-
-    if search_id:
-        result = df[df['Boar Ear Tag'].astype(str).str.contains(search_id, na=False, case=False)]
-    else:
-        result = df
-
     if not result.empty:
-        # Latest record for current status
+        # 取得最新一筆資料
         latest_row = result.sort_values(by='Date', ascending=False).iloc[0]
-
-        # --- Dashboard Layout ---
-        col_main, col_side = st.columns([3, 1])
-
-        with col_side:
-            st.subheader("Current Grade / Gred Semasa")
-            # Logic for Grade Display
-            grade_val = latest_row.get('Grade', 'N/A')
-            st.metric(label="GRADE / GRED", value=grade_val)
-            
-            # Simple metadata
-            st.info(f"**Breed / Baka:** {latest_row.get('Breed', 'N/A')}")
-            st.info(f"**Last Date / Tarikh Akhir:** {latest_row['Date'].strftime('%Y-%m-%d') if pd.notnull(latest_row['Date']) else 'N/A'}")
-
-        with col_main:
-            st.subheader("I. Grading Indicators / Penunjuk Gred (V:AD)")
-            # Transposing for better vertical reading on mobile/tablets
-            grade_data = latest_row[grade_cols].to_frame(name="Value / Nilai")
-            st.table(grade_data)
-
-        st.markdown("---")
-
-        # --- History Section ---
-        st.subheader("II. 4-Week Activity Log / Log Aktiviti 4 Minggu (BY:CE)")
         
-        # Filter for 4 weeks
-        mask = (result['Date'] >= four_weeks_limit)
-        history_df = result[mask].sort_values(by='Date', ascending=False)
+        # --- MIDDLE: I. Grading Indicators ---
+        st.markdown("## I. GRADING INDICATORS / PENUNJUK GRED")
+        
+        # V:AD 範圍 (索引 21 到 30)
+        grade_cols = df.columns[21:30]
+        
+        m1, m2, m3, m4 = st.columns(4)
+        with m1:
+            st.metric("CURRENT GRADE", str(latest_row.get('Grade', 'N/A')))
+        with m2:
+            st.metric("BREED", str(latest_row.get('Breed', 'N/A')))
+        with m3:
+            st.metric("VITALITY", str(latest_row.get('aktiviti\nVitality', 'N/A')))
+        with m4:
+            st.metric("CONCENTRATION", str(latest_row.get('penumpuan, Concentration\n(x100 million/ml)', 'N/A')))
 
-        if not history_df.empty:
-            st.dataframe(history_df[history_cols], use_container_width=True, hide_index=True)
+        # 顯示 V:AD 詳細表格
+        st.table(latest_row[grade_cols].to_frame().T)
+
+        # --- BOTTOM: 使用頻率與紀錄 ---
+        # 1. 計算頻率 (Frequency)
+        four_weeks_limit = datetime.now() - timedelta(weeks=4)
+        recent_activity = result[result['Date'] >= four_weeks_limit]
+        usage_frequency = len(recent_activity)
+
+        st.markdown(f"## USAGE FREQUENCY (PAST 4 WEEKS): **{usage_frequency} TIMES**")
+        
+        # 2. 活動紀錄紀錄 (BY:CE) - 動態標題取自 BZ2:CE2 邏輯
+        # 排除標題列後，直接呈現內容
+        st.markdown("## ACTIVITY LOG / REKOD AKTIVITI")
+        
+        # 顯示 BY:CE 範圍 (索引 76 到 83)
+        history_cols = df.columns[76:83]
+        if not recent_activity.empty:
+            # 隱藏 index，讓畫面更乾淨
+            st.dataframe(recent_activity[history_cols].sort_values(by='Date', ascending=False), 
+                         use_container_width=True, hide_index=True)
         else:
-            st.warning("No records found in the past 4 weeks. / Tiada rekod dalam 4 minggu lepas.")
+            st.warning("No activity records in the past 4 weeks. / Tiada rekod aktiviti dalam 4 minggu.")
 
     else:
-        st.warning("No data found for this Boar ID. / Tiada data untuk ID Boar ini.")
-
+        st.error("BOAR ID NOT FOUND / ID BOAR TIDAK DIJUMPA")
 else:
-    st.info("System Ready. Please use the sidebar to search. / Sistem sedia. Sila guna bar sisi untuk cari.")
+    st.info("System Ready. Please input Boar Ear Tag above.")
