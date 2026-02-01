@@ -3,91 +3,98 @@ import pandas as pd
 from datetime import datetime, timedelta
 
 # --- 專業化介面設定 ---
-st.set_page_config(page_title="GLA Boar System", layout="wide")
+st.set_page_config(page_title="GLA Boar Performance Dashboard", layout="wide")
 
-# CSS 優化：縮小字體、緊湊排版，符合商業報表風格
 st.markdown("""
     <style>
     .block-container { padding-top: 1rem; }
-    h2 { font-size: 18px !important; color: #1E3A8A; font-weight: bold; border-left: 5px solid #1E3A8A; padding-left: 10px; margin-bottom: 10px; }
+    h2 { font-size: 18px !important; color: #1E3A8A; font-weight: bold; border-left: 5px solid #1E3A8A; padding-left: 10px; margin-top: 20px; }
     .stTable { font-size: 12px !important; }
-    .stDataFrame { font-size: 12px !important; }
-    .stMetric { background-color: #F8FAFC; border: 1px solid #CBD5E1; }
+    .stMetric { background-color: #F8FAFC; border: 1px solid #CBD5E1; padding: 10px; border-radius: 4px; }
     </style>
     """, unsafe_allow_html=True)
 
-def load_data():
-    # Google Sheets 連結與分頁 ID
+def load_data(gid):
     sheet_id = "1qvo4INF0LZjA2u49grKW_cHeEPJO48_dk6gOlXoMgaM"
-    gid = "1428367761"
     url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
     try:
-        # 直接讀取全表
         df = pd.read_csv(url)
-        # 強制轉換日期欄位，確保排序功能正常
-        if 'Date' in df.columns:
-            df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+        # 修正欄位名稱，移除可能的空白或換行符號
+        df.columns = [c.strip() for c in df.columns]
         return df
     except Exception as e:
-        st.error(f"連線失敗: {e}")
+        st.error(f"連線失敗 (GID: {gid}): {e}")
         return None
 
-# --- 第一層：查詢框架 (Search Framework) ---
-df = load_data()
+# 1. 載入資料 (Boar info: 1251336110, Boar: 1428367761)
+df_info = load_data("1251336110") # Boar info 分頁
+df_history = load_data("1428367761") # Boar (歷史紀錄) 分頁
 
-st.markdown("## SEARCH / CARIAN (查詢)")
+# --- TOP: 查詢框架 ---
+st.markdown("## 🔍 SEARCH BOAR / CARI BOAR")
 search_id = st.text_input("輸入公豬耳號 (Enter Boar ID):", placeholder="例如: L10020...").strip()
 
-if df is not None and search_id:
-    # 根據耳號過濾數據
-    result = df[df['Boar Ear Tag'].astype(str).str.contains(search_id, na=False, case=False)]
+if (df_info is not None and df_history is not None) and search_id:
+    # 統一轉換日期格式
+    if 'Date' in df_history.columns:
+        df_history['Date'] = pd.to_datetime(df_history['Date'], errors='coerce')
     
-    if not result.empty:
-        # 排序：確保最新的一筆在最上面
-        result = result.sort_values(by='Date', ascending=False)
-        latest_row = result.iloc[0]
-        
-        # --- 第二層：I. Grading Indicators (V:AD 範圍) ---
-        st.markdown("## I. GRADING INDICATORS / PENUNJUK GRED")
-        
-        # 提取 V 到 AD 欄位 (索引 21 到 30)
-        grade_cols = list(df.columns[21:30])
-        
-        # 儀表板核心指標
-        m1, m2, m3 = st.columns(3)
+    # 篩選資料
+    info_res = df_info[df_info['Tag ID'].astype(str).str.contains(search_id, na=False, case=False)]
+    hist_res = df_history[df_history['Boar Ear Tag'].astype(str).str.contains(search_id, na=False, case=False)]
+
+    if not info_res.empty:
+        # 取得最新一筆歷史紀錄
+        latest_hist = hist_res.sort_values(by='Date', ascending=False).iloc[0] if not hist_res.empty else None
+        info_row = info_res.iloc[0]
+
+        # --- 第一部分：核心狀態 (第一行) ---
+        st.markdown("## I. CORE STATUS / STATUS TERAS")
+        m1, m2, m3, m4 = st.columns(4)
         with m1:
-            st.metric("CURRENT GRADE (等級)", str(latest_row.get('Grade', 'N/A')))
+            st.metric("Boar ID", str(info_row.get('Tag ID', 'N/A')))
         with m2:
-            st.metric("BREED (品種)", str(latest_row.get('Breed', 'N/A')))
+            st.metric("CURRENT GRADE", str(info_row.get('Grade', 'N/A')))
         with m3:
-            st.metric("LAST RECORD (最新紀錄)", latest_row['Date'].strftime('%Y-%m-%d') if pd.notnull(latest_row['Date']) else "N/A")
+            st.metric("BREED", str(info_row.get('Breed', 'N/A')))
+        with m4:
+            last_date = latest_hist['Date'].strftime('%Y-%m-%d') if latest_hist is not None and pd.notnull(latest_hist['Date']) else "N/A"
+            st.metric("LAST RECORD", last_date)
 
-        # 呈現 V:AD 詳細數據表
-        st.table(latest_row[grade_cols].to_frame().T)
+        # --- 第二部分：Boar Info 詳細資料 (B:J 範圍) ---
+        st.markdown("## II. BREEDING METRICS / METRIK PEMBIAKAN (B:J)")
+        # 嚴格對應您要求的欄位：Grade, Breed, Tag ID, Index Score, Avg TSO, Mated, CR %, Avg Birth Wt, Strategy
+        target_cols = ['Grade', 'Breed', 'Tag ID', 'Index Score', 'Avg TSO', 'Mated', 'CR %', 'Avg Birth Wt', 'Strategy']
+        # 檢查欄位是否存在於資料中，避免 Error
+        display_info = info_row[[c for c in target_cols if c in info_row.index]].to_frame().T
+        st.table(display_info)
 
+        # --- 第三部分：使用頻率與精蟲資訊 (最新四周) ---
         st.markdown("---")
-
-        # --- 第三層：使用頻率與紀錄 (BY:CE 範圍) ---
-        # 1. 計算過去 4 週的使用頻率
-        four_weeks_limit = datetime.now() - timedelta(weeks=4)
-        recent_activity = result[result['Date'] >= four_weeks_limit]
-        usage_freq = len(recent_activity)
-
-        st.markdown(f"## USAGE FREQUENCY (4 WEEKS): :red[{usage_freq} TIMES / 次]")
+        st.markdown("## III. 4-WEEK USAGE & SEMEN ANALYSIS / ANALISIS SPERMA")
         
-        # 2. 顯示活動紀錄 (BY:CE)
-        st.markdown("## II. ACTIVITY LOG / REKOD AKTIVITI")
+        # 這裡從 Boar info 分頁提取您指定的統計數據 (假設這些統計已在該分頁計算好)
+        freq_cols = ['Breed', 'Gen', 'Tag ID', 'W05', 'W04', 'W03', 'W02', 'W01']
         
-        # 提取 BY 到 CE 欄位 (索引 76 到 83)
-        history_cols = list(df.columns[76:83])
-        if not recent_activity.empty:
-            # 呈現表格，並隱藏序號列
-            st.dataframe(recent_activity[history_cols], use_container_width=True, hide_index=True)
-        else:
-            st.warning("過去 4 週內無使用紀錄。")
+        # 核心效能指標 (從 info 分頁提取)
+        c1, c2, c3, c4 = st.columns(4)
+        with c1:
+            st.metric("📈 3. Usage Frequency", str(info_row.get('W01', '0')))
+        with c2:
+            st.metric("💧 5. Sperm Conc.", str(info_row.get('Avg TSO', 'N/A')))
+        with c3:
+            # 假設 Impurities 與 Volume 存在於您的 Info 表中，若無則顯示 N/A
+            st.metric("⚠️ 6. Impurities (%)", str(info_row.get('Impurities', 'N/A')))
+        with m4:
+            st.metric("🥛 7. History Volume", str(info_row.get('Volume', 'N/A')))
+
+        # 顯示週次歷史表格
+        st.markdown("### Weekly Usage History / Sejarah Penggunaan Mingguan")
+        weekly_display = info_row[[c for c in freq_cols if c in info_row.index]].to_frame().T
+        st.table(weekly_display)
 
     else:
-        st.error("找不到該公豬編號，請重新確認。")
+        st.error("找不到該公豬編號 (Boar ID Not Found)")
 else:
     if not search_id:
-        st.info("系統就緒，請在上方輸入公豬耳號。")
+        st.info("請輸入公豬耳號以顯示育種與作業分析報告。")
