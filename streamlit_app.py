@@ -1,8 +1,9 @@
 import streamlit as st
 import pandas as pd
+import re
 
-# --- 專業管理介面設定 ---
-st.set_page_config(page_title="GLA Boar System v7.0", layout="wide")
+# --- System Configuration / Konfigurasi Sistem ---
+st.set_page_config(page_title="GLA Boar System v7.2", layout="wide")
 
 st.markdown("""
     <style>
@@ -21,84 +22,77 @@ def fetch_data(gid):
     sheet_id = "1qvo4INF0LZjA2u49grKW_cHeEPJO48_dk6gOlXoMgaM"
     url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&gid={gid}"
     try:
-        # header=None 以物理索引操作，避免標題粘連報錯
         df = pd.read_csv(url, header=None)
-        # 移除所有數據中可能的隱藏空格
         df = df.applymap(lambda x: x.strip() if isinstance(x, str) else x)
         return df
     except Exception as e:
-        st.error(f"數據加載失敗: {e}")
+        st.error(f"Connection Failed / Sambungan Gagal: {e}")
         return None
 
-# 讀取數據 (分頁 GID: 1428367761)
+# Load Data (GID: 1428367761)
 df_raw = fetch_data("1428367761")
 
-if df_raw is not None:
-    st.markdown("## 🔍 搜尋公豬耳號 / SEARCH BOAR ID")
-    search_id = st.text_input("", placeholder="輸入耳號 (例如: D1401)...", label_visibility="collapsed").strip()
+# --- 1. Search Framework / Kerangka Carian ---
+st.markdown("## 🔍 SEARCH BOAR ID / CARI ID BOAR")
+search_input = st.text_input("", placeholder="Enter ID or Number (e.g. 1401 or D1401)...", label_visibility="collapsed").strip()
 
-    if search_id:
-        try:
-            # 數據從 Row 3 開始 (索引 2)
-            data_rows = df_raw.iloc[2:].copy()
-            
-            # --- 第一部分：育種資訊 (維持固定 V:AD 座標，索引 21-29) ---
-            # 搜尋耳號欄位：鎖定索引 23 (物理 X 欄，對應第一表 Tag ID)
-            res_info = data_rows[data_rows[23].astype(str).str.fullmatch(search_id, case=False, na=False)]
-            
-            if not res_info.empty:
-                st.markdown("## I. 公豬等級與資訊 (BOAR INFORMATION)")
-                df_v_ad = res_info.iloc[[0], 21:30].copy() 
-                df_v_ad.columns = [
-                    'Grade', 'Breed', 'Tag ID', 'Index Score', 
-                    'Strategy (策略)', 'Avg TSO', 'Mated', 'CR %', 'Avg Birth Wt'
-                ]
-                
-                # 數據整數化處理
-                for col in df_v_ad.columns:
-                    df_v_ad[col] = pd.to_numeric(df_v_ad[col], errors='ignore')
-                    if df_v_ad[col].dtype in ['float64', 'int64']:
-                        df_v_ad[col] = df_v_ad[col].fillna(0).astype(int)
-                st.table(df_v_ad)
-            
-            # --- 第二部分：最近 10 次採精結果 (A:K 範圍) ---
-            # 搜尋耳號欄位：鎖定索引 2 (物理 C 欄，Boar Ear Tag)
-            res_semen = data_rows[data_rows[2].astype(str).str.fullmatch(search_id, case=False, na=False)]
-            
-            if not res_semen.empty:
-                st.markdown("## II. 最近 10 次採精紀錄 (LAST 10 EXTRACTIONS)")
-                
-                # 選取 A:K 範圍 (索引 0 到 10)
-                df_a_k = res_semen.iloc[:, 0:11].copy()
-                df_a_k.columns = [
-                    'Date', 'Breed', 'Boar Ear Tag', 
-                    'Volume Collected (ml)', 'Odor (Bau)', 'Color (Warna)', 
-                    'Vitality (Aktiviti)', 'Concentration (x100m)', 
-                    'Morphology Impurities (%)', 'Volume After Dilution (ml)', 'Other Record'
-                ]
-                
-                # 日期排序：確保 Date 欄位 (索引 0) 為時間格式
-                df_a_k['Date'] = pd.to_datetime(df_a_k['Date'], errors='coerce')
-                df_a_k = df_a_k.sort_values(by='Date', ascending=False).head(10)
-                
-                # 格式化日期顯示
-                df_a_k['Date'] = df_a_k['Date'].dt.strftime('%Y-%m-%d')
-                
-                # 數值精簡化 (濃度與雜質保留必要格式，其餘整數化)
-                for col in df_a_k.columns:
-                    if col not in ['Date', 'Breed', 'Boar Ear Tag', 'Odor (Bau)', 'Color (Warna)', 'Other Record']:
-                        df_a_k[col] = pd.to_numeric(df_a_k[col], errors='coerce').fillna(0)
-                        # 若無小數則轉整數
-                        df_a_k[col] = df_a_k[col].apply(lambda x: int(x) if x == int(x) else round(x, 2))
+if df_raw is not None and search_input:
+    try:
+        data_rows = df_raw.iloc[2:].copy()
+        
+        # --- Fuzzy Search Logic / Logik Carian Kabur ---
+        # 1. 搜尋表 I (索引 23, X 欄) 與 表 II (索引 2, C 欄)
+        # 支援大小寫不限與包含比對 (contains)
+        def fuzzy_filter(df, col_idx, query):
+            return df[df[col_idx].astype(str).str.contains(query, case=False, na=False)]
 
-                st.table(df_a_k)
-            else:
-                st.warning(f"在採精紀錄 (A:K) 中查無耳號: {search_id}")
-                
-            if res_info.empty and res_semen.empty:
-                st.error(f"系統查無此公豬耳號之任何數據。")
+        res_info = fuzzy_filter(data_rows, 23, search_input)
+        res_semen = fuzzy_filter(data_rows, 2, search_input)
+        
+        if not res_info.empty:
+            st.markdown("## I. BOAR GRADE & INFORMATION / GRED & MAKLUMAT BOAR")
+            # 若有多筆，取第一筆精確度最高的或最新的
+            df_v_ad = res_info.iloc[[0], 21:30].copy() 
+            df_v_ad.columns = [
+                'Grade / Gred', 'Breed / Baka', 'Tag ID / No. Tag', 'Index Score / Skor Indeks', 
+                'Strategy / Strategi', 'Avg TSO', 'Mated / Mengawan', 'CR % / Kadar 受胎', 'Avg Birth Wt / Berat Lahir'
+            ]
+            
+            for col in df_v_ad.columns:
+                df_v_ad[col] = pd.to_numeric(df_v_ad[col], errors='ignore')
+                if df_v_ad[col].dtype in ['float64', 'int64']:
+                    df_v_ad[col] = df_v_ad[col].fillna(0).astype(int)
+            st.table(df_v_ad)
+        
+        if not res_semen.empty:
+            st.markdown("## II. RECENT 10 EXTRACTIONS / 10 REKOD PENGUMPULAN TERKINI")
+            
+            df_a_k = res_semen.iloc[:, 0:11].copy()
+            df_a_k.columns = [
+                'Date / Tarikh', 'Breed / Baka', 'Boar ID / No. Tag', 
+                'Volume Collected (ml)', 'Odor / Bau', 'Color / Warna', 
+                'Vitality / Aktiviti', 'Concentration', 
+                'Impurities (%)', 'Volume After Dilution (ml)', 'Other Record'
+            ]
+            
+            # Sort and Top 10
+            df_a_k['Date / Tarikh'] = pd.to_datetime(df_a_k['Date / Tarikh'], errors='coerce')
+            df_a_k = df_a_k.sort_values(by='Date / Tarikh', ascending=False).head(10)
+            df_a_k['Date / Tarikh'] = df_a_k['Date / Tarikh'].dt.strftime('%Y-%m-%d')
+            
+            for col in df_a_k.columns:
+                if col not in ['Date / Tarikh', 'Breed / Baka', 'Boar ID / No. Tag', 'Odor / Bau', 'Color / Warna', 'Other Record']:
+                    df_a_k[col] = pd.to_numeric(df_a_k[col], errors='coerce').fillna(0)
+                    df_final_val = df_a_k[col].apply(lambda x: int(x) if x == int(x) else round(x, 2))
+                    df_a_k[col] = df_final_val
 
-        except Exception as e:
-            st.error(f"解析錯誤: {e}")
+            st.table(df_a_k)
+        else:
+            if res_info.empty:
+                st.warning(f"No results for '{search_input}' / Tiada keputusan untuk '{search_input}'.")
+
+    except Exception as e:
+        st.error(f"Error / Ralat: {e}")
 else:
-    st.info("💡 請輸入公豬耳號。")
+    st.info("💡 Enter Boar ID or number to search / Masukkan ID Boar atau nombor untuk carian.")
+
