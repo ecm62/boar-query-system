@@ -104,4 +104,12 @@ if df_main is not None and search_id:
                     st.markdown(f"**{label} 趨勢**")
                     temp_df = res[target_cols + week_cols].copy()
                     # 數值格式化
-                    for col in temp_df.
+                    for col in temp_df.select_dtypes(include=['number']).columns:
+                        temp_df[col] = temp_df[col].astype(int)
+                    st.table(temp_df)
+        else:
+            st.error(f"未找到耳號: {search_id}")
+    else:
+        st.error("數據源中缺少 'Tag ID' 欄位。")
+else:
+    st.info("💡 請輸入公豬耳號以啟動數據分析。")
