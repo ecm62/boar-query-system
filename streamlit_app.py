@@ -1,8 +1,8 @@
 import streamlit as st
 import pandas as pd
 
-# --- 1. UI CUSTOMIZATION ---
-st.set_page_config(page_title="GLA Boar Elite v8.2", layout="wide")
+# --- 1. PROFESSIONAL UI ---
+st.set_page_config(page_title="GLA Boar Elite v8.3", layout="wide")
 
 st.markdown("""
     <style>
@@ -18,7 +18,7 @@ st.markdown("""
     }
     .stTable { background-color: white; border-radius: 10px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05); }
     .stTable th { background-color: #1E3A8A !important; color: white !important; text-align: center !important; }
-    .stTable td { text-align: center !important; }
+    .stTable td { text-align: center !important; vertical-align: middle !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -27,7 +27,6 @@ def fetch_data(sheet_id, gid, header_row=0):
     url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
     try:
         df = pd.read_csv(url, header=header_row)
-        # Clean column names immediately
         df.columns = [str(c).strip() for c in df.columns]
         df = df.applymap(lambda x: x.strip() if isinstance(x, str) else x)
         return df
@@ -47,8 +46,8 @@ def format_val(val):
 GRADE_SID = "1vK71OXZum2NrDkAPktOVz01-sXoETcdxdrBgC4jtc-c"
 SEMEN_SID = "1qvo4INF0LZjA2u49grKW_cHeEPJO48_dk6gOlXoMgaM"
 
-# --- 4. APP ---
-st.markdown('<div class="main-header"><h1>GLA BOAR PERFORMANCE ANALYTICS</h1><p>Bilingual Professional Management v8.2</p></div>', unsafe_allow_html=True)
+# --- 4. APP LAYOUT ---
+st.markdown('<div class="main-header"><h1>GLA BOAR PERFORMANCE ANALYTICS</h1><p>Bilingual Professional Management v8.3</p></div>', unsafe_allow_html=True)
 
 col1, col2, col3 = st.columns([1, 2, 1])
 with col2:
@@ -60,53 +59,45 @@ if search_query:
     df_g = fetch_data(GRADE_SID, "0", header_row=1)
     
     if df_g is not None:
-        # 1. Identify ID Column
+        # 動態鎖定關鍵欄位 (模糊匹配)
         id_col = next((c for c in df_g.columns if 'Tag' in c or 'ID' in c), None)
+        strat_col = next((c for c in df_g.columns if 'Strategy' in c), None) # 模糊尋找包含 Strategy 的欄位
         
         if id_col:
             res_g = df_g[df_g[id_col].astype(str).str.contains(search_query, case=False, na=False)]
             if not res_g.empty:
-                # 2. Robust Column Selection (Only select if exists)
+                # 定義輸出對應與顯示名稱
                 mapping = {
                     'Grade': 'Grade', 
                     'Breed': 'Breed', 
                     id_col: 'Tag ID',
                     'Index Score': 'Index Score', 
-                    'Strategy': 'Strategy',
+                    strat_col: 'Strategy', # 使用動態偵測到的欄位名
                     'Avg TSO': 'Avg TSO', 
                     'Mated': 'Mated', 
                     'CR %': 'CR %'
                 }
                 
-                # Check which keys actually exist in the dataframe
-                existing_cols = [k for k in mapping.keys() if k in df_g.columns]
+                # 過濾出實際存在的欄位
+                valid_mapping = {k: v for k, v in mapping.items() if k is not None and k in df_g.columns}
+                out_g = res_g[list(valid_mapping.keys())].rename(columns=valid_mapping).head(1).copy()
                 
-                # Filter and Rename
-                out_g = res_g[existing_cols].rename(columns=mapping).head(1).copy()
-                
-                # 3. Format numeric columns
-                for k in ['Index Score', 'Avg TSO', 'Mated', 'CR %']:
-                    target_name = mapping.get(k)
-                    if target_name in out_g.columns:
-                        out_g[target_name] = out_g[target_name].apply(format_val)
+                # 格式化數值
+                for col in ['Index Score', 'Avg TSO', 'Mated', 'CR %']:
+                    if col in out_g.columns:
+                        out_g[col] = out_g[col].apply(format_val)
                 
                 st.table(out_g)
-                
-                # Diagnostic help (only shown if columns are missing)
-                missing = set(mapping.keys()) - set(df_g.columns)
-                if missing:
-                    st.caption(f"Note: Some columns were not found in the sheet: {missing}")
             else:
                 st.warning(f"No match found for ID: {search_query}")
         else:
-            st.error(f"Cannot find ID column. Found columns: {list(df_g.columns)}")
+            st.error("Cannot find ID column. Please check Header Row 2.")
 
     # --- SECTION II: EXTRACTIONS ---
     st.markdown('<p class="section-title">II. RECENT 20 EXTRACTION LOGS</p>', unsafe_allow_html=True)
     df_s = fetch_data(SEMEN_SID, "1428367761", header_row=0)
     
     if df_s is not None:
-        # Use Index 2 for the ID column in Extraction sheet
         res_s = df_s[df_s.iloc[:, 2].astype(str).str.contains(search_query, case=False, na=False)]
         if not res_s.empty:
             out_s = res_s.iloc[:, 0:11].copy()
