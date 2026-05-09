@@ -17,17 +17,18 @@ st.markdown("""
         margin-bottom: 30px;
     }
     
-    /* KPI 指標卡片 */
+    /* 單一 KPI 指標卡片 (調整為適合單個指標的樣式) */
     .metric-container {
-        display: flex; justify-content: space-between; gap: 20px; margin-bottom: 25px;
+        display: flex; justify-content: center; margin-bottom: 25px; /* 置中對齊 */
     }
     .metric-box {
-        background: white !important; padding: 20px; border-radius: 12px; flex: 1;
+        background: white !important; padding: 25px 40px; border-radius: 12px; 
         text-align: center; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
         border-top: 5px solid #3B82F6;
+        min-width: 300px; /* 確保單一卡片有足夠寬度 */
     }
-    .metric-label { font-size: 14px; color: #64748B !important; font-weight: 600; text-transform: uppercase; }
-    .metric-value { font-size: 28px; color: #1E3A8A !important; font-weight: 800; margin-top: 5px; }
+    .metric-label { font-size: 16px; color: #64748B !important; font-weight: 600; text-transform: uppercase; }
+    .metric-value { font-size: 36px; color: #1E3A8A !important; font-weight: 800; margin-top: 10px; }
 
     /* 等級標籤 (Badges) */
     .badge-elite {
@@ -64,7 +65,6 @@ def fetch_data(sheet_id, gid, header_row=0):
     try:
         df = pd.read_csv(url, header=header_row)
         df.columns = [str(c).strip() for c in df.columns]
-        # 使用 2026 最新 Pandas 語法
         df = df.map(lambda x: x.strip() if isinstance(x, str) else x)
         return df
     except Exception as e:
@@ -92,7 +92,7 @@ with col2:
 
 if search_query:
     # --- I. GENETIC PERFORMANCE ---
-    st.markdown('<p class="section-title">I. GENETIC RANKING & KPI</p>', unsafe_allow_html=True)
+    st.markdown('<p class="section-title">I. PERFORMANCE KPI</p>', unsafe_allow_html=True)
     df_g = fetch_data(GRADE_SID, "0", header_row=1)
     
     if df_g is not None:
@@ -104,17 +104,9 @@ if search_query:
             if not res_g.empty:
                 data = res_g.iloc[0]
                 
-                # 指標卡片區塊
+                # --- 修改處：單一指標卡片區塊 ---
                 st.markdown(f"""
                 <div class="metric-container">
-                    <div class="metric-box">
-                        <div class="metric-label">Genetic Index</div>
-                        <div class="metric-value">{format_val(data.get('Index Score', 'N/A'))}</div>
-                    </div>
-                    <div class="metric-box">
-                        <div class="metric-label">Conception Rate</div>
-                        <div class="metric-value" style="color: #059669 !important;">{format_val(data.get('CR %', 'N/A'), '%')}</div>
-                    </div>
                     <div class="metric-box">
                         <div class="metric-label">Avg TSO</div>
                         <div class="metric-value">{format_val(data.get('Avg TSO', 'N/A'))}</div>
@@ -122,7 +114,7 @@ if search_query:
                 </div>
                 """, unsafe_allow_html=True)
 
-                # 詳細資料卡
+                # 詳細資料卡保持不變，維持版面結構
                 with st.container():
                     st.markdown('<div class="data-card">', unsafe_allow_html=True)
                     c1, c2, c3 = st.columns(3)
@@ -132,7 +124,7 @@ if search_query:
                     with c2:
                         grade_val = data.get('Grade', 'Unknown')
                         st.markdown(f"**GRADE:** <span class='badge-elite'>{grade_val}</span>", unsafe_allow_html=True)
-                        st.markdown(f"**TOTAL MATED:** `{data.get('Mated')}`")
+                        st.markdown(f"**TOTAL MATED:** `{format_val(data.get('Mated', 0))}`")
                     with c3:
                         st.markdown(f"**MANAGEMENT STRATEGY:**")
                         st.info(data.get(strat_col, "No strategy defined."))
