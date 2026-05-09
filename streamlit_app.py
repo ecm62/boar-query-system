@@ -6,54 +6,51 @@ st.set_page_config(page_title="GLA Boar Elite v8.5", layout="wide")
 
 st.markdown("""
     <style>
-    /* 全域背景與字體強制設定 */
-    .stApp { background-color: #F1F5F9 !important; color: #1E293B !important; }
+    /* 全域背景 */
+    .stApp { background-color: #F8FAFC !important; color: #1E293B !important; }
     
     /* 頂部標題 */
     .main-header {
-        text-align: center; color: #FFFFFF !important; padding: 30px;
+        text-align: center; color: #FFFFFF !important; padding: 25px;
         background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%) !important;
-        border-radius: 15px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
-        margin-bottom: 30px;
+        border-radius: 12px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+        margin-bottom: 25px;
     }
     
-    /* 單一 KPI 指標卡片 (調整為適合單個指標的樣式) */
-    .metric-container {
-        display: flex; justify-content: center; margin-bottom: 25px; /* 置中對齊 */
+    /* 四大狀態框佈局 */
+    .status-container {
+        display: flex; justify-content: space-between; gap: 15px; margin-bottom: 25px;
     }
-    .metric-box {
-        background: white !important; padding: 25px 40px; border-radius: 12px; 
+    .status-box {
+        background: white !important; padding: 15px; border-radius: 10px; flex: 1;
         text-align: center; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
-        border-top: 5px solid #3B82F6;
-        min-width: 300px; /* 確保單一卡片有足夠寬度 */
+        border: 1px solid #E2E8F0; border-top: 4px solid #3B82F6;
     }
-    .metric-label { font-size: 16px; color: #64748B !important; font-weight: 600; text-transform: uppercase; }
-    .metric-value { font-size: 36px; color: #1E3A8A !important; font-weight: 800; margin-top: 10px; }
+    .status-label { font-size: 12px; color: #64748B !important; font-weight: 700; text-transform: uppercase; margin-bottom: 5px; }
+    .status-value { font-size: 20px; color: #1E3A8A !important; font-weight: 800; }
+    
+    /* 策略專用框樣式 */
+    .strategy-box {
+        background-color: #EFF6FF !important; border-top: 4px solid #10B981 !important;
+    }
 
     /* 等級標籤 (Badges) */
-    .badge-elite {
+    .badge-grade {
         background-color: #1E3A8A !important; color: #FFFFFF !important;
-        padding: 4px 12px; border-radius: 20px; font-weight: bold; font-size: 14px;
+        padding: 2px 10px; border-radius: 15px; font-weight: bold; font-size: 18px;
     }
     
     /* 章節標題 */
     .section-title {
         border-left: 6px solid #1E3A8A; padding-left: 15px;
-        color: #1E3A8A !important; font-weight: 800; font-size: 22px; margin: 40px 0 20px 0;
-    }
-
-    /* 數據卡片區域 */
-    .data-card {
-        background: white !important; padding: 25px; border-radius: 15px;
-        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 1px solid #E2E8F0;
+        color: #1E3A8A !important; font-weight: 800; font-size: 20px; margin: 30px 0 15px 0;
     }
 
     /* 表格樣式美化 */
-    .stTable { background-color: white !important; border-radius: 10px; overflow: hidden; }
-    .stTable th { background-color: #F8FAFC !important; color: #1E3A8A !important; font-weight: 700 !important; }
-    .stTable td { color: #334155 !important; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    .stTable { background-color: white !important; border-radius: 8px; overflow: hidden; }
+    .stTable th { background-color: #F1F5F9 !important; color: #1E3A8A !important; font-weight: 700 !important; }
+    .stTable td { color: #334155 !important; font-family: 'Consolas', monospace; }
     
-    /* 隱藏預設元件 */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     </style>
@@ -71,11 +68,11 @@ def fetch_data(sheet_id, gid, header_row=0):
         st.error(f"FETCH ERROR: {e}")
         return None
 
-def format_val(val, suffix=""):
+def format_val(val):
     try:
         if pd.isna(val) or val == "": return "0.0"
         num = pd.to_numeric(str(val).replace('%',''), errors='coerce')
-        return f"{float(num):.1f}{suffix}" if pd.notnull(num) else str(val)
+        return f"{float(num):.1f}" if pd.notnull(num) else str(val)
     except:
         return str(val)
 
@@ -84,15 +81,14 @@ GRADE_SID = "1vK71OXZum2NrDkAPktOVz01-sXoETcdxdrBgC4jtc-c"
 SEMEN_SID = "1qvo4INF0LZjA2u49grKW_cHeEPJO48_dk6gOlXoMgaM"
 
 # --- 4. APP LAYOUT ---
-st.markdown('<div class="main-header"><h1>GLA BOAR PERFORMANCE ANALYTICS</h1><p style="opacity: 0.8; font-weight: 500;">Precision Swine Management & Breeding Intelligence</p></div>', unsafe_allow_html=True)
+st.markdown('<div class="main-header"><h1>GLA BOAR PERFORMANCE ANALYTICS</h1><p style="opacity: 0.8; font-size: 14px;">PhD Standard Swine Breeding Dashboard</p></div>', unsafe_allow_html=True)
 
 col1, col2, col3 = st.columns([1, 1.5, 1])
 with col2:
-    search_query = st.text_input("🔍 SEARCH BOAR ID / CARI ID BOAR", placeholder="Enter Boar ID (e.g. 1401)").strip()
+    search_query = st.text_input("🔍 SEARCH BOAR ID / CARI ID BOAR", placeholder="e.g. 1400").strip()
 
 if search_query:
-    # --- I. GENETIC PERFORMANCE ---
-    st.markdown('<p class="section-title">I. PERFORMANCE KPI</p>', unsafe_allow_html=True)
+    # --- I. STATUS TILES (The 4 Boxes) ---
     df_g = fetch_data(GRADE_SID, "0", header_row=1)
     
     if df_g is not None:
@@ -104,51 +100,44 @@ if search_query:
             if not res_g.empty:
                 data = res_g.iloc[0]
                 
-                # --- 修改處：單一指標卡片區塊 ---
-                st.markdown(f"""
-                <div class="metric-container">
-                    <div class="metric-box">
-                        <div class="metric-label">Avg TSO</div>
-                        <div class="metric-value">{format_val(data.get('Avg TSO', 'N/A'))}</div>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
+                # 四個核心框佈局
+                c1, c2, c3, c4 = st.columns(4)
+                with c1:
+                    st.markdown(f'<div class="status-box"><div class="status-label">TAG ID</div><div class="status-value">{data.get(id_col)}</div></div>', unsafe_allow_html=True)
+                with c2:
+                    st.markdown(f'<div class="status-box"><div class="status-label">BREED</div><div class="status-value">{data.get("Breed")}</div></div>', unsafe_allow_html=True)
+                with c3:
+                    st.markdown(f'<div class="status-box"><div class="status-label">GRADE</div><div class="status-value"><span class="badge-grade">{data.get("Grade", "N/A")}</span></div></div>', unsafe_allow_html=True)
+                with c4:
+                    st.markdown(f'<div class="status-box strategy-box"><div class="status-label">MANAGEMENT STRATEGY</div><div class="status-value">{data.get(strat_col, "N/A")}</div></div>', unsafe_allow_html=True)
 
-                # 詳細資料卡保持不變，維持版面結構
-                with st.container():
-                    st.markdown('<div class="data-card">', unsafe_allow_html=True)
-                    c1, c2, c3 = st.columns(3)
-                    with c1:
-                        st.markdown(f"**TAG ID:** `{data.get(id_col)}`")
-                        st.markdown(f"**BREED:** `{data.get('Breed')}`")
-                    with c2:
-                        grade_val = data.get('Grade', 'Unknown')
-                        st.markdown(f"**GRADE:** <span class='badge-elite'>{grade_val}</span>", unsafe_allow_html=True)
-                        st.markdown(f"**TOTAL MATED:** `{format_val(data.get('Mated', 0))}`")
-                    with c3:
-                        st.markdown(f"**MANAGEMENT STRATEGY:**")
-                        st.info(data.get(strat_col, "No strategy defined."))
-                    st.markdown('</div>', unsafe_allow_html=True)
+                # 展示 Avg TSO 指標 (保持與上回一致的專業呈現)
+                st.markdown('<p class="section-title">PERFORMANCE KPI</p>', unsafe_allow_html=True)
+                st.metric(label="Average TSO", value=format_val(data.get('Avg TSO', '0.0')))
+                
             else:
-                st.warning(f"No match found for Boar ID: {search_query}")
+                st.warning(f"No match found for: {search_query}")
 
-    # --- II. EXTRACTION LOGS ---
+    # --- II. EXTRACTION LOGS (NOTE REMOVED) ---
     st.markdown('<p class="section-title">II. RECENT EXTRACTION DATA (TOP 20)</p>', unsafe_allow_html=True)
     df_s = fetch_data(SEMEN_SID, "1428367761", header_row=0)
     
     if df_s is not None:
+        # 使用第 2 欄位進行搜尋 (ID 欄位)
         res_s = df_s[df_s.iloc[:, 2].astype(str).str.contains(search_query, case=False, na=False)]
         if not res_s.empty:
-            out_s = res_s.iloc[:, 0:11].copy()
-            out_s.columns = ['Date', 'Breed', 'ID', 'Vol(ml)', 'Odor', 'Color', 'Vit', 'Conc', 'Imp%', 'Diluted', 'Note']
+            # 修正處：只選取前 10 欄位，移除第 11 欄 (Note)
+            out_s = res_s.iloc[:, 0:10].copy()
+            out_s.columns = ['Date', 'Breed', 'ID', 'Vol(ml)', 'Odor', 'Color', 'Vit', 'Conc', 'Imp%', 'Diluted']
+            
             out_s['Date'] = pd.to_datetime(out_s['Date'], errors='coerce')
             out_s = out_s.sort_values(by='Date', ascending=False).head(20)
             out_s['Date'] = out_s['Date'].dt.strftime('%Y-%m-%d')
             
-            # 格式化數值欄位
+            # 格式化數值
             num_cols = ['Vol(ml)', 'Vit', 'Conc', 'Imp%', 'Diluted']
-            for nc in num_cols: out_s[nc] = out_s[nc].apply(lambda x: format_val(x))
+            for nc in num_cols: out_s[nc] = out_s[nc].apply(format_val)
             
             st.table(out_s)
         else:
-            st.warning("No extraction history available in the system.")
+            st.warning("No extraction history found.")
