@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 
-# --- 1. CONFIG & REFINED UI ---
+# --- 1. CONFIG & DISCREET UI ---
 st.set_page_config(page_title="GLA Boar Elite v8.5", layout="wide")
 
 st.markdown("""
@@ -85,7 +85,8 @@ st.markdown('<div class="main-header"><h1>GLA BOAR PERFORMANCE ANALYTICS</h1><p 
 
 col1, col2, col3 = st.columns([1, 1.5, 1])
 with col2:
-    search_query = st.text_input("🔍 SEARCH BOAR ID / CARI ID BOAR", placeholder="e.g. 1400").strip()
+    # 修正點：移除 placeholder 暗示文字
+    search_query = st.text_input("SEARCH BOAR ID / CARI ID BOAR", placeholder="").strip()
 
 if search_query:
     # --- I. STATUS TILES (The 4 Boxes) ---
@@ -100,7 +101,6 @@ if search_query:
             if not res_g.empty:
                 data = res_g.iloc[0]
                 
-                # 四個核心框佈局
                 c1, c2, c3, c4 = st.columns(4)
                 with c1:
                     st.markdown(f'<div class="status-box"><div class="status-label">TAG ID</div><div class="status-value">{data.get(id_col)}</div></div>', unsafe_allow_html=True)
@@ -111,22 +111,20 @@ if search_query:
                 with c4:
                     st.markdown(f'<div class="status-box strategy-box"><div class="status-label">MANAGEMENT STRATEGY</div><div class="status-value">{data.get(strat_col, "N/A")}</div></div>', unsafe_allow_html=True)
 
-                # 展示 Avg TSO 指標 (保持與上回一致的專業呈現)
                 st.markdown('<p class="section-title">PERFORMANCE KPI</p>', unsafe_allow_html=True)
                 st.metric(label="Average TSO", value=format_val(data.get('Avg TSO', '0.0')))
                 
             else:
-                st.warning(f"No match found for: {search_query}")
+                st.warning(f"No match found for given ID.")
 
-    # --- II. EXTRACTION LOGS (NOTE REMOVED) ---
+    # --- II. EXTRACTION LOGS ---
     st.markdown('<p class="section-title">II. RECENT EXTRACTION DATA (TOP 20)</p>', unsafe_allow_html=True)
     df_s = fetch_data(SEMEN_SID, "1428367761", header_row=0)
     
     if df_s is not None:
-        # 使用第 2 欄位進行搜尋 (ID 欄位)
         res_s = df_s[df_s.iloc[:, 2].astype(str).str.contains(search_query, case=False, na=False)]
         if not res_s.empty:
-            # 修正處：只選取前 10 欄位，移除第 11 欄 (Note)
+            # 修正處：嚴格取 0 到 10 欄位，確保第 11 欄 (Note) 不被載入
             out_s = res_s.iloc[:, 0:10].copy()
             out_s.columns = ['Date', 'Breed', 'ID', 'Vol(ml)', 'Odor', 'Color', 'Vit', 'Conc', 'Imp%', 'Diluted']
             
@@ -134,7 +132,6 @@ if search_query:
             out_s = out_s.sort_values(by='Date', ascending=False).head(20)
             out_s['Date'] = out_s['Date'].dt.strftime('%Y-%m-%d')
             
-            # 格式化數值
             num_cols = ['Vol(ml)', 'Vit', 'Conc', 'Imp%', 'Diluted']
             for nc in num_cols: out_s[nc] = out_s[nc].apply(format_val)
             
