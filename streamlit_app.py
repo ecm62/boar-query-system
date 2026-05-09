@@ -28,7 +28,8 @@ def fetch_data(sheet_id, gid, header_row=0):
     try:
         df = pd.read_csv(url, header=header_row)
         df.columns = [str(c).strip() for c in df.columns]
-        df = df.applymap(lambda x: x.strip() if isinstance(x, str) else x)
+        # 核心修正：使用 map 替代 applymap 以符合最新 pandas 規範
+        df = df.map(lambda x: x.strip() if isinstance(x, str) else x)
         return df
     except Exception as e:
         st.error(f"FETCH ERROR: {e}")
@@ -59,30 +60,26 @@ if search_query:
     df_g = fetch_data(GRADE_SID, "0", header_row=1)
     
     if df_g is not None:
-        # 動態鎖定關鍵欄位 (模糊匹配)
         id_col = next((c for c in df_g.columns if 'Tag' in c or 'ID' in c), None)
-        strat_col = next((c for c in df_g.columns if 'Strategy' in c), None) # 模糊尋找包含 Strategy 的欄位
+        strat_col = next((c for c in df_g.columns if 'Strategy' in c), None)
         
         if id_col:
             res_g = df_g[df_g[id_col].astype(str).str.contains(search_query, case=False, na=False)]
             if not res_g.empty:
-                # 定義輸出對應與顯示名稱
                 mapping = {
                     'Grade': 'Grade', 
                     'Breed': 'Breed', 
                     id_col: 'Tag ID',
                     'Index Score': 'Index Score', 
-                    strat_col: 'Strategy', # 使用動態偵測到的欄位名
+                    strat_col: 'Strategy', 
                     'Avg TSO': 'Avg TSO', 
                     'Mated': 'Mated', 
                     'CR %': 'CR %'
                 }
                 
-                # 過濾出實際存在的欄位
                 valid_mapping = {k: v for k, v in mapping.items() if k is not None and k in df_g.columns}
                 out_g = res_g[list(valid_mapping.keys())].rename(columns=valid_mapping).head(1).copy()
                 
-                # 格式化數值
                 for col in ['Index Score', 'Avg TSO', 'Mated', 'CR %']:
                     if col in out_g.columns:
                         out_g[col] = out_g[col].apply(format_val)
