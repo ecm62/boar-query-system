@@ -81,7 +81,7 @@ GRADE_SID = "1vK71OXZum2NrDkAPktOVz01-sXoETcdxdrBgC4jtc-c"
 SEMEN_SID = "1qvo4INF0LZjA2u49grKW_cHeEPJO48_dk6gOlXoMgaM"
 
 # --- 4. APP LAYOUT ---
-st.markdown('<div class="main-header"><h1>GLA BOAR PERFORMANCE ANALYTICS</h1><p style="opacity: 0.8; font-size: 14px;">PhD Standard Swine Breeding Dashboard</p></div>', unsafe_allow_html=True)
+st.markdown('<div class="main-header"><h1>GLA BOAR PERFORMANCE ANALYTICS</h1><p style="opacity: 0.8; font-size: 14px;">Standard Swine Breeding Dashboard</p></div>', unsafe_allow_html=True)
 
 col1, col2, col3 = st.columns([1, 1.5, 1])
 with col2:
